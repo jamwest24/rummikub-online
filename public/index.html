@@ -78,7 +78,7 @@
   .tile.sel{outline:3px solid var(--brass);outline-offset:1px;transform:translateY(-6px)}
   .tile.new::after{content:"";position:absolute;top:4px;right:4px;width:6px;height:6px;border-radius:50%;background:var(--brass);box-shadow:0 0 5px var(--brass)}
   .tile.back{background:linear-gradient(158deg,#8a5a2b,#5d3a1d)}
-  .ghost{position:fixed;z-index:99;pointer-events:none;transform:translate(-50%,-50%) scale(1.06) rotate(-3deg);filter:drop-shadow(0 10px 14px rgba(0,0,0,.45))}
+  .tileghost{position:fixed;z-index:99;pointer-events:none;transform:translate(-50%,-50%) scale(1.06) rotate(-3deg);filter:drop-shadow(0 10px 14px rgba(0,0,0,.45))}
   .tray-wrap{padding:8px 12px 12px}
   .tray-label{display:flex;align-items:center;gap:8px;margin:0 4px 7px;font-size:13px;font-weight:600;color:var(--bone)}
   .tray-label .who{color:var(--brass);font-weight:700}
@@ -287,7 +287,7 @@ function tapContainer(dest){ if(!sel)return; moveTile(sel,dest,null); }
 function pointerDown(ev,t){
   ev.preventDefault(); const sx=ev.clientX,sy=ev.clientY; let moved=false,ghost=null;
   const move=e=>{ const dx=e.clientX-sx,dy=e.clientY-sy;
-    if(!moved&&Math.hypot(dx,dy)>7){moved=true;ghost=mkTile(t,false);ghost.classList.add('ghost');document.body.appendChild(ghost);}
+    if(!moved&&Math.hypot(dx,dy)>7){moved=true;ghost=mkTile(t,false);ghost.classList.add('tileghost');document.body.appendChild(ghost);}
     if(moved){ghost.style.left=e.clientX+'px';ghost.style.top=e.clientY+'px';hl(e.clientX,e.clientY);} };
   const up=e=>{ document.removeEventListener('pointermove',move);document.removeEventListener('pointerup',up);clearHL();
     if(moved){ if(ghost)ghost.remove(); const tg=drop(e.clientX,e.clientY); if(tg)moveTile(t.id,tg.dest,tg.idx); else render(); }
