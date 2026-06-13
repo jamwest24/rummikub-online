@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no">
+<title>Rummikub Online</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Bricolage+Grotesque:wght@600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --felt:#0f4d3c;--felt-2:#0a3a2d;--felt-edge:#072a20;
+    --wood:#7a4f2b;--wood-2:#5d3a1d;--wood-hi:#9c6a3c;
+    --bone:#f4ead3;--bone-sh:#b9a677;--red:#cf2f24;--blue:#1f6fb2;--orange:#e0851a;--ink:#262320;
+    --brass:#d9b25a;--brass-deep:#a8852f;--paper:#f6f0e2;--dim:#9db7ab;
+    --card:#10342a;--edge:#1c4d3f;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%}
+  body{font-family:'Inter',system-ui,sans-serif;color:var(--paper);min-height:100dvh;user-select:none;
+    background:radial-gradient(120% 90% at 50% -10%,#14624c 0%,var(--felt) 38%,var(--felt-2) 78%,var(--felt-edge) 100%);overflow-x:hidden}
+  .wrap{max-width:1080px;margin:0 auto;min-height:100dvh;display:flex;flex-direction:column}
+  /* lobby */
+  .center{flex:1;display:flex;align-items:center;justify-content:center;padding:22px}
+  .panel{width:100%;max-width:430px;background:linear-gradient(180deg,#fbf6ea,var(--paper));color:var(--ink);
+    border-radius:22px;padding:26px;box-shadow:0 24px 60px rgba(0,0,0,.5)}
+  .brand{text-align:center;margin-bottom:6px}
+  .brand h1{font-family:'Bricolage Grotesque';font-weight:800;font-size:30px;letter-spacing:-.02em;color:var(--ink)}
+  .brand small{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--brass-deep);font-weight:700}
+  .sub{font-size:14px;color:#6a6256;line-height:1.5;margin:10px 0 18px;text-align:center}
+  label{display:block;font-size:12px;text-transform:uppercase;letter-spacing:.1em;color:#8a8275;font-weight:600;margin:0 0 6px 2px}
+  input{width:100%;font-family:inherit;font-size:17px;font-weight:600;color:var(--ink);background:#fff;border:2px solid #e0d6bd;border-radius:12px;padding:13px 14px;margin-bottom:14px}
+  input:focus{outline:none;border-color:var(--brass)}
+  input.code{text-transform:uppercase;letter-spacing:.4em;text-align:center;font-family:'Bricolage Grotesque';font-size:24px}
+  button{font-family:inherit;font-weight:700;font-size:15px;cursor:pointer;border:none;border-radius:12px;padding:14px;width:100%;transition:transform .06s,filter .15s}
+  button:active{transform:translateY(1px)}button:disabled{opacity:.4;cursor:not-allowed}
+  .primary{background:linear-gradient(180deg,var(--brass),var(--brass-deep));color:#3a2c0a;box-shadow:0 3px 0 #7d6320}
+  .ghost{background:#efe7d4;color:#6a6256;border:2px solid #e0d6bd}
+  .err{background:#fbe2db;border:1px solid var(--red);color:#7a241b;border-radius:10px;padding:10px 12px;font-size:13.5px;margin-bottom:13px}
+  .codebox{text-align:center;margin-bottom:8px}
+  .codebox .c{font-family:'Bricolage Grotesque';font-size:46px;letter-spacing:.12em;color:var(--brass-deep)}
+  .copy{background:none;border:none;color:var(--blue);font-weight:600;font-size:13px;text-decoration:underline;width:auto;padding:6px}
+  .plist{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin:14px 0}
+  .ppill{background:#efe7d4;border:1px solid #e0d6bd;border-radius:999px;padding:8px 14px;font-weight:600;font-size:14px}
+  .ppill.host{border-color:var(--brass-deep)}
+  /* game */
+  header{display:flex;align-items:center;gap:10px;padding:12px 16px 8px;flex-wrap:wrap}
+  header .ttl{font-family:'Bricolage Grotesque';font-weight:800;font-size:18px;color:var(--bone);margin-right:auto}
+  .chip{background:rgba(0,0,0,.22);border:1px solid rgba(255,255,255,.08);border-radius:999px;padding:6px 12px;font-size:13px;font-weight:600}
+  .chip b{color:var(--brass)}
+  .seats{display:flex;gap:8px;flex-wrap:wrap;padding:2px 16px 6px}
+  .seat{background:rgba(0,0,0,.2);border:1px solid var(--edge);border-radius:11px;padding:7px 12px;font-size:13px;font-weight:600;display:flex;gap:8px;align-items:center}
+  .seat.turn{border-color:var(--brass);box-shadow:0 0 0 1px var(--brass),0 0 16px rgba(217,178,90,.25);color:var(--brass)}
+  .seat .ct{color:var(--dim);font-weight:500}
+  .seat.off{opacity:.45}
+  .board-scroll{flex:1;overflow:auto;padding:6px 14px}
+  .board{min-height:200px;border-radius:18px;padding:14px;display:flex;flex-wrap:wrap;gap:12px;align-content:flex-start;
+    background:linear-gradient(180deg,rgba(255,255,255,.04),rgba(0,0,0,.10)),repeating-linear-gradient(45deg,rgba(0,0,0,.05) 0 6px,rgba(255,255,255,.012) 6px 12px);
+    box-shadow:inset 0 0 0 1px rgba(255,255,255,.05),inset 0 18px 40px rgba(0,0,0,.28)}
+  .set{display:flex;gap:3px;padding:8px;border-radius:12px;background:rgba(0,0,0,.16);border:1.5px dashed rgba(255,255,255,.10)}
+  .set.valid{border-style:solid;border-color:rgba(217,178,90,.55);background:rgba(217,178,90,.08)}
+  .set.bad{border-color:rgba(207,47,36,.5);background:rgba(207,47,36,.07)}
+  .set.drop{border-color:var(--bone);background:rgba(244,234,211,.14)}
+  .newzone{display:flex;align-items:center;justify-content:center;min-width:74px;min-height:74px;border-radius:12px;border:1.5px dashed rgba(255,255,255,.16);color:rgba(255,255,255,.5);font-size:12px;font-weight:600;text-align:center;padding:6px}
+  .newzone.drop{border-color:var(--bone);color:var(--bone)}
+  .board-empty{margin:auto;color:rgba(255,255,255,.5);font-size:14px;text-align:center;padding:36px}
+  .tile{position:relative;width:44px;height:60px;border-radius:8px;flex:0 0 auto;
+    background:linear-gradient(158deg,#fff7e6,var(--bone) 42%,#ece0c4);
+    box-shadow:0 1px 0 #fff inset,0 -3px 0 var(--bone-sh) inset,0 3px 5px rgba(0,0,0,.32);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:'Baloo 2';font-weight:800;font-size:26px;line-height:1}
+  .tile.drag{cursor:grab}.tile.drag:active{cursor:grabbing}
+  .tile .dot{width:7px;height:7px;border-radius:50%;margin-top:4px;opacity:.9}
+  .tile.r{color:var(--red)}.tile.r .dot{background:var(--red)}
+  .tile.b{color:var(--blue)}.tile.b .dot{background:var(--blue)}
+  .tile.o{color:var(--orange)}.tile.o .dot{background:var(--orange)}
+  .tile.k{color:var(--ink)}.tile.k .dot{background:var(--ink)}
+  .tile.joker{color:var(--red);font-size:29px}
+  .tile.sel{outline:3px solid var(--brass);outline-offset:1px;transform:translateY(-6px)}
+  .tile.new::after{content:"";position:absolute;top:4px;right:4px;width:6px;height:6px;border-radius:50%;background:var(--brass);box-shadow:0 0 5px var(--brass)}
+  .tile.back{background:linear-gradient(158deg,#8a5a2b,#5d3a1d)}
+  .ghost{position:fixed;z-index:99;pointer-events:none;transform:translate(-50%,-50%) scale(1.06) rotate(-3deg);filter:drop-shadow(0 10px 14px rgba(0,0,0,.45))}
+  .tray-wrap{padding:8px 12px 12px}
+  .tray-label{display:flex;align-items:center;gap:8px;margin:0 4px 7px;font-size:13px;font-weight:600;color:var(--bone)}
+  .tray-label .who{color:var(--brass);font-weight:700}
+  .tray{border-radius:14px;padding:12px;display:flex;flex-wrap:wrap;gap:6px;min-height:84px;align-content:flex-start;
+    background:linear-gradient(180deg,var(--wood-hi),var(--wood) 30%,var(--wood-2));
+    box-shadow:0 2px 0 rgba(255,255,255,.12) inset,0 -6px 14px rgba(0,0,0,.3) inset,0 6px 14px rgba(0,0,0,.3)}
+  .tray.drop{box-shadow:0 0 0 2px var(--bone) inset}
+  .controls{display:flex;gap:8px;flex-wrap:wrap;padding:0 12px 14px;align-items:center}
+  .controls button{width:auto;padding:11px 15px}
+  .b-primary{background:linear-gradient(180deg,var(--brass),var(--brass-deep));color:#3a2c0a;box-shadow:0 3px 0 #7d6320}
+  .b-ghost{background:rgba(0,0,0,.25);color:var(--paper);border:1px solid rgba(255,255,255,.12)}
+  .status{margin-left:auto;font-size:13px;font-weight:600;color:var(--bone);text-align:right;max-width:55%}
+  .status.warn{color:#ffcaa3}
+  .waiting{text-align:center;color:var(--dim);font-size:14px;padding:14px}
+  .overlay{position:fixed;inset:0;z-index:60;display:flex;align-items:center;justify-content:center;padding:20px;background:radial-gradient(120% 100% at 50% 0%,rgba(8,42,32,.86),rgba(4,22,17,.96))}
+  .winner{font-family:'Bricolage Grotesque';font-weight:800;font-size:30px;color:var(--brass-deep);text-align:center;margin:4px 0}
+  .stand{list-style:none;margin:8px 0 16px}.stand li{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #ece3cf;color:#544d42;font-size:14px}.stand b{color:var(--ink)}
+  .offline{position:fixed;top:0;left:0;right:0;background:var(--brass-deep);color:#3a2c0a;text-align:center;padding:7px;font-weight:700;font-size:13px;display:none;z-index:80}
+  @media(max-width:560px){.tile{width:38px;height:52px;font-size:22px}.status{max-width:100%}}
+</style>
+</head>
+<body>
+<div class="offline" id="offline">Reconnecting…</div>
+<div class="wrap" id="wrap"></div>
+<div id="overlay"></div>
+<script>
+/* engine (for live set colouring) */
+const COLORS=['r','b','o','k']; let _u=0; const uid=p=>p+(_u++);
+function isValidGroup(ts){if(ts.length<3||ts.length>4)return false;const r=ts.filter(t=>!t.joker);if(r.length){const n=r[0].num;if(!r.every(t=>t.num===n))return false;if(new Set(r.map(t=>t.color)).size!==r.length)return false;}return true;}
+function runStart(ts){let s=null;for(let i=0;i<ts.length;i++){if(ts[i].joker)continue;const v=ts[i].num-i;if(s===null)s=v;else if(s!==v)return null;}return s;}
+function isValidRun(ts){if(ts.length<3||ts.length>13)return false;const r=ts.filter(t=>!t.joker);if(r.length){const c=r[0].color;if(!r.every(t=>t.color===c))return false;}const s=runStart(ts);return s!==null&&s>=1&&s+ts.length-1<=13;}
+const isValidSet=ts=>isValidGroup(ts)||isValidRun(ts);
+
+/* net + state */
+const wrap=document.getElementById('wrap'), overlay=document.getElementById('overlay');
+const qs=new URLSearchParams(location.search);
+let ws, S=null, ME={id:null,name:''}, screen='connect', err='';
+let WB=null, WR=null, turnNew=new Set(), mySeq=-1, sel=null, statusMsg='';
+
+const esc=s=>(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function connect(){
+  const proto=location.protocol==='https:'?'wss':'ws';
+  ws=new WebSocket(`${proto}://${location.host}/ws`);
+  ws.onopen=()=>{ off(false);
+    const saved=JSON.parse(localStorage.getItem('rk')||'null');
+    if(saved&&saved.code&&saved.id){ ME.id=saved.id; ME.name=saved.name||''; ws.send(JSON.stringify({type:'join',code:saved.code,name:ME.name,playerId:ME.id})); } };
+  ws.onmessage=e=>{ const m=JSON.parse(e.data); onMsg(m); };
+  ws.onclose=()=>{ off(true); setTimeout(connect,1500); };
+  ws.onerror=()=>ws.close();
+}
+const off=v=>document.getElementById('offline').style.display=v?'block':'none';
+function onMsg(m){
+  if(m.type==='joined'){ ME.id=m.playerId; localStorage.setItem('rk',JSON.stringify({code:m.code,id:m.id,name:ME.name})); }
+  if(m.type==='error'){ err=m.message; if(!S) render(); else { statusMsg=m.message; renderStatus(true); } }
+  if(m.type==='reject'){ statusMsg=m.message; renderStatus(true); shake(); }
+  if(m.type==='state'){ S=m.state; err=''; screen=S.phase==='lobby'?'lobby':(S.phase==='over'?'game':'game'); syncWorking(); render(); }
+}
+const sendJSON=o=>ws&&ws.readyState===1&&ws.send(JSON.stringify(o));
+
+function syncWorking(){
+  if(S&&S.you&&S.you.yourTurn){
+    if(S.turnSeq!==mySeq){ mySeq=S.turnSeq;
+      WB=S.board.map(set=>({id:uid('s'),tiles:set.map(t=>({...t}))}));
+      WR=S.you.rack.map(t=>({...t})); turnNew=new Set(); statusMsg=''; sel=null; }
+  } else { WB=null;WR=null;turnNew=new Set();mySeq=-1;sel=null; }
+}
+
+/* ---------- render ---------- */
+function render(){
+  if(!S){ return renderConnect(); }
+  if(S.phase==='lobby') return renderLobby();
+  return renderGame();
+}
+function renderConnect(){
+  const preCode=(qs.get('room')||'').toUpperCase();
+  wrap.innerHTML=`<div class="center"><div class="panel">
+    <div class="brand"><h1>Rummikub Online</h1><small>play across the miles</small></div>
+    <div class="sub">${preCode?'You were invited to a game. Enter your name to join.':'Start a new game and send your sister the link, or join with a code.'}</div>
+    ${err?`<div class="err">${esc(err)}</div>`:''}
+    ${preCode?'':`<label>Your name</label><input id="nm" maxlength="14" placeholder="e.g. ${esc(qs.get('n')||'You')}" value="${esc(ME.name)}">
+      <button class="primary" id="create">Start a new game</button>
+      <div style="height:14px"></div><label>Or join with a code</label>`}
+    ${preCode?`<label>Your name</label><input id="nm" maxlength="14" placeholder="e.g. Sis" value="${esc(ME.name)}">`:''}
+    <input id="cd" class="code" maxlength="4" placeholder="CODE" autocapitalize="characters" value="${esc(preCode)}">
+    <button class="${preCode?'primary':'ghost'}" id="join">Join game</button>
+  </div></div>`;
+  const c=document.getElementById('create'); if(c) c.onclick=()=>{ const n=val('nm'); if(!n){err='Enter a name first.';return render();} ME.name=n; sendJSON({type:'create',name:n}); };
+  document.getElementById('join').onclick=()=>{ const n=val('nm'),code=val('cd').toUpperCase(); if(!n){err='Enter a name first.';return render();} if(code.length!==4){err='Codes are 4 letters.';return render();} ME.name=n; sendJSON({type:'join',code,name:n,playerId:ME.id}); };
+}
+const val=id=>{const e=document.getElementById(id);return e?e.value.trim():'';};
+
+function renderLobby(){
+  const host=S.hostId===ME.id, n=S.players.length;
+  wrap.innerHTML=`<div class="center"><div class="panel">
+    <div class="brand"><h1>Game ready</h1></div>
+    <div class="codebox"><div class="sub" style="margin-bottom:2px">Room code</div><div class="c">${S.code}</div>
+      <button class="copy" id="copy">copy invite link for your sister</button></div>
+    <div class="plist">${S.players.map(p=>`<span class="ppill ${p.id===S.hostId?'host':''}">${p.id===S.hostId?'★ ':''}${esc(p.name)}</span>`).join('')}</div>
+    ${host?`<button class="primary" id="start" ${n<2?'disabled':''}>Start game</button>
+       <div class="sub" style="margin:12px 0 0">${n<2?'Waiting for your sister to join…':`${n} players in — deal whenever you're ready.`}</div>`
+      :`<div class="sub">Waiting for the host to start…</div>`}
+  </div></div>`;
+  document.getElementById('copy').onclick=()=>{ const url=`${location.origin}/?room=${S.code}`;
+    navigator.clipboard?.writeText(url).then(()=>{const b=document.getElementById('copy');b.textContent='link copied ✓';setTimeout(()=>b.textContent='copy invite link for your sister',1800);}); };
+  if(host) document.getElementById('start').onclick=()=>sendJSON({type:'start'});
+}
+
+function renderGame(){
+  const yt=S.you&&S.you.yourTurn;
+  const board=yt?WB:S.board.map(set=>({id:'s',tiles:set}));
+  const rack=yt?WR:S.you.rack;
+  const opp=S.players.filter(p=>p.id!==ME.id);
+  wrap.innerHTML=`
+   <header><div class="ttl">Rummikub</div>
+     <div class="chip">Pool <b>${S.poolCount}</b></div>
+     <div class="chip">${esc(S.code)}</div></header>
+   <div class="seats">${S.players.map(p=>`<div class="seat ${p.isTurn?'turn':''} ${p.connected?'':'off'}">
+      ${p.id===ME.id?'You':esc(p.name)} <span class="ct">${p.tiles} tiles${p.melded?'':' · needs 30'}</span></div>`).join('')}</div>
+   <div class="board-scroll"><div class="board" id="board"></div></div>
+   <div class="tray-wrap">
+     <div class="tray-label">${yt?`<span class="who">Your turn</span> — drag tiles up to play`:`<span class="who">${esc(S.turnName)}'s turn</span> — your rack`}</div>
+     <div class="tray" id="tray"></div>
+   </div>
+   <div class="controls" id="controls"></div>`;
+  // board
+  const bEl=document.getElementById('board');
+  if(board.length===0){ const e=document.createElement('div');e.className='board-empty';e.textContent='No tiles played yet. Make runs (e.g. 4·5·6 one colour) and sets (e.g. three 7s, different colours) totalling 30+ to start.';bEl.appendChild(e); }
+  board.forEach(s=>{
+    const sd=document.createElement('div'); sd.className='set'; sd.dataset.zone='set'; sd.dataset.sid=s.id;
+    if(s.tiles.length>=3) sd.classList.add(isValidSet(s.tiles)?'valid':'bad'); else if(s.tiles.length) sd.classList.add('bad');
+    s.tiles.forEach(t=>sd.appendChild(mkTile(t,yt)));
+    if(yt) sd.addEventListener('click',e=>{if(e.target.closest('.tile'))return;tapContainer({kind:'set',set:s});});
+    bEl.appendChild(sd);
+  });
+  if(yt){ const nz=document.createElement('div');nz.className='newzone';nz.dataset.zone='new';nz.textContent='+ new group';
+    nz.addEventListener('click',()=>tapContainer({kind:'new'})); bEl.appendChild(nz); }
+  // tray
+  const tEl=document.getElementById('tray'); tEl.dataset.zone='rack';
+  rack.forEach(t=>tEl.appendChild(mkTile(t,yt)));
+  if(yt) tEl.addEventListener('click',e=>{if(e.target.closest('.tile'))return;tapContainer({kind:'rack'});});
+  // controls
+  const c=document.getElementById('controls');
+  if(yt){
+    c.innerHTML=`<button class="b-primary" id="end">End turn</button>
+      <button class="b-ghost" id="draw">${S.poolCount?'Draw & pass':'Pass'}</button>
+      <button class="b-ghost" id="reset">Reset</button>
+      <button class="b-ghost" id="sr">Sort runs</button>
+      <button class="b-ghost" id="sg">Sort sets</button>
+      <div class="status" id="status">${statusMsg?esc(statusMsg):(S.you.melded?'Play tiles or rearrange the table, then end your turn.':'First play must total 30+ from your own tiles.')}</div>`;
+    document.getElementById('end').onclick=commit;
+    document.getElementById('draw').onclick=()=>sendJSON({type:'draw'});
+    document.getElementById('reset').onclick=()=>{mySeq=-1;statusMsg='';syncWorking();render();};
+    document.getElementById('sr').onclick=()=>sortRack('run');
+    document.getElementById('sg').onclick=()=>sortRack('group');
+    if(statusMsg) document.getElementById('status').classList.add('warn');
+  } else {
+    c.innerHTML=`<div class="waiting">Waiting for ${esc(S.turnName)} to play…</div>`;
+  }
+  renderOverlay();
+}
+function renderStatus(warn){ const st=document.getElementById('status'); if(st){st.textContent=statusMsg; st.classList.toggle('warn',!!warn);} }
+function renderOverlay(){
+  overlay.innerHTML='';
+  if(S.phase==='over'){
+    const host=S.hostId===ME.id;
+    const o=document.createElement('div'); o.className='overlay';
+    o.innerHTML=`<div class="panel">
+      <div class="brand"><small>Game over</small></div>
+      <div class="winner">${esc(S.winnerName)} wins! 🎉</div>
+      <ul class="stand">${(S.standings||[]).map(s=>`<li><span>${esc(s.name)}</span><b>${s.left} pts left</b></li>`).join('')}</ul>
+      ${host?`<button class="primary" id="rematch">Play again</button>`:`<div class="sub">Waiting for host to start a rematch…</div>`}</div>`;
+    overlay.appendChild(o);
+    if(host) document.getElementById('rematch').onclick=()=>sendJSON({type:'rematch'});
+  }
+}
+
+/* ---------- tiles + interaction ---------- */
+function mkTile(t,draggable){
+  const e=document.createElement('div');
+  e.className=(t.joker?'tile joker':'tile '+t.color)+(draggable?' drag':'');
+  e.dataset.id=t.id;
+  if(turnNew.has(t.id)) e.classList.add('new');
+  if(sel===t.id) e.classList.add('sel');
+  e.innerHTML=t.joker?'★':`<span>${t.num}</span><span class="dot"></span>`;
+  if(draggable) e.addEventListener('pointerdown',ev=>pointerDown(ev,t));
+  return e;
+}
+function findTile(id){
+  for(const s of WB){const i=s.tiles.findIndex(t=>t.id===id);if(i>=0)return{from:'set',set:s,idx:i,tile:s.tiles[i]};}
+  const i=WR.findIndex(t=>t.id===id); if(i>=0)return{from:'rack',idx:i,tile:WR[i]};
+  return null;
+}
+function moveTile(id,dest,idx){
+  const loc=findTile(id); if(!loc)return;
+  if(loc.from==='set'){ if(dest.kind==='rack'&&!turnNew.has(id)){shake();return;} loc.set.tiles.splice(loc.idx,1); }
+  else WR.splice(loc.idx,1);
+  const t=loc.tile;
+  if(dest.kind==='rack'){ turnNew.delete(id); ins(WR,t,idx); }
+  else if(dest.kind==='new'){ if(loc.from==='rack')turnNew.add(id); WB.push({id:uid('s'),tiles:[t]}); }
+  else { if(loc.from==='rack')turnNew.add(id); ins(dest.set.tiles,t,idx); }
+  WB=WB.filter(s=>s.tiles.length); sel=null; statusMsg=''; render();
+}
+const ins=(a,t,i)=>{ if(i==null||i<0||i>a.length)a.push(t); else a.splice(i,0,t); };
+function tapContainer(dest){ if(!sel)return; moveTile(sel,dest,null); }
+
+function pointerDown(ev,t){
+  ev.preventDefault(); const sx=ev.clientX,sy=ev.clientY; let moved=false,ghost=null;
+  const move=e=>{ const dx=e.clientX-sx,dy=e.clientY-sy;
+    if(!moved&&Math.hypot(dx,dy)>7){moved=true;ghost=mkTile(t,false);ghost.classList.add('ghost');document.body.appendChild(ghost);}
+    if(moved){ghost.style.left=e.clientX+'px';ghost.style.top=e.clientY+'px';hl(e.clientX,e.clientY);} };
+  const up=e=>{ document.removeEventListener('pointermove',move);document.removeEventListener('pointerup',up);clearHL();
+    if(moved){ if(ghost)ghost.remove(); const tg=drop(e.clientX,e.clientY); if(tg)moveTile(t.id,tg.dest,tg.idx); else render(); }
+    else { sel=sel===t.id?null:t.id; render(); } };
+  document.addEventListener('pointermove',move);document.addEventListener('pointerup',up);
+}
+function contAt(x,y){ const el=document.elementFromPoint(x,y); return el&&el.closest('[data-zone]'); }
+function drop(x,y){ const c=contAt(x,y); if(!c)return null; const z=c.dataset.zone;
+  if(z==='new')return{dest:{kind:'new'}};
+  if(z==='rack')return{dest:{kind:'rack'},idx:insIdx(c,x)};
+  if(z==='set'){const s=WB.find(s=>s.id===c.dataset.sid);if(!s)return null;return{dest:{kind:'set',set:s},idx:insIdx(c,x)};}
+  return null;
+}
+function insIdx(c,x){const tiles=[...c.querySelectorAll('.tile')];let i=tiles.length;for(let k=0;k<tiles.length;k++){const r=tiles[k].getBoundingClientRect();if(x<r.left+r.width/2){i=k;break;}}return i;}
+let hlEl=null; function hl(x,y){clearHL();const c=contAt(x,y);if(c){c.classList.add('drop');hlEl=c;}} function clearHL(){if(hlEl){hlEl.classList.remove('drop');hlEl=null;}}
+function shake(){const t=document.getElementById('tray');if(t)t.animate([{transform:'translateX(0)'},{transform:'translateX(-6px)'},{transform:'translateX(6px)'},{transform:'translateX(0)'}],{duration:240});}
+function sortRack(mode){
+  const jok=WR.filter(t=>t.joker),real=WR.filter(t=>!t.joker);
+  if(mode==='run')real.sort((a,b)=>a.color===b.color?a.num-b.num:COLORS.indexOf(a.color)-COLORS.indexOf(b.color));
+  else real.sort((a,b)=>a.num===b.num?COLORS.indexOf(a.color)-COLORS.indexOf(b.color):a.num-b.num);
+  WR=[...real,...jok]; render();
+}
+function commit(){
+  // light local check for fast feedback
+  for(const s of WB){ if(s.tiles.length&&(s.tiles.length<3||!isValidSet(s.tiles))){ statusMsg='Every group must be a valid run or set of 3+.'; renderStatus(true); shake(); return; } }
+  if(turnNew.size===0){ statusMsg='Play at least one tile, or draw instead.'; renderStatus(true); shake(); return; }
+  sendJSON({type:'commit',board:WB.map(s=>s.tiles.map(t=>t.id))});
+}
+renderConnect(); connect();
+</script>
+</body>
+</html>

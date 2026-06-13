@@ -1,0 +1,10 @@
+{
+  "name": "rummikub-online",
+  "version": "1.0.0",
+  "description": "Online 2-4 player Rummikub-style tile game. Share a link, play in real time over WebSockets.",
+  "main": "server.js",
+  "type": "commonjs",
+  "scripts": { "start": "node server.js" },
+  "dependencies": { "ws": "^8.18.0" },
+  "engines": { "node": ">=18" }
+}
