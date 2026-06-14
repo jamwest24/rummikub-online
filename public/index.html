@@ -120,6 +120,7 @@ let WB=null, WR=null, turnNew=new Set(), mySeq=-1, sel=null, statusMsg='', rackO
 let CODE=null, reconnecting=false;
 const lsGet=(k,d)=>{try{const v=localStorage.getItem(k);return v==null?d:JSON.parse(v);}catch{return d;}};
 const saveOrder=()=>{ if(CODE){ try{ localStorage.setItem('rkorder:'+CODE, JSON.stringify(rackOrder)); }catch{} } };
+let notifiedSeq=-1, audioCtx=null, titleTimer=null, soundOn=lsGet('rk_sound',true);
 
 const esc=s=>(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 function connect(){
@@ -144,8 +145,31 @@ function onMsg(m){
     else { err=m.message; if(!S) render(); else { statusMsg=m.message; renderStatus(true); } }
   }
   if(m.type==='reject'){ statusMsg=m.message; renderStatus(true); shake(); }
-  if(m.type==='state'){ S=m.state; CODE=S.code; err=''; screen=S.phase==='lobby'?'lobby':'game'; syncWorking(); render(); }
+  if(m.type==='state'){ S=m.state; CODE=S.code; err=''; screen=S.phase==='lobby'?'lobby':'game'; syncWorking(); render(); maybeNotify(); }
 }
+/* ---- turn alert: chime + tab-title blink ---- */
+function unlockAudio(){ try{ if(!audioCtx){ const AC=window.AudioContext||window.webkitAudioContext; if(AC) audioCtx=new AC(); } if(audioCtx&&audioCtx.state==='suspended') audioCtx.resume(); }catch(e){} }
+function chime(){
+  if(!soundOn) return; unlockAudio(); if(!audioCtx) return;
+  const now=audioCtx.currentTime;
+  [{f:659.25,t:0},{f:987.77,t:0.13}].forEach(n=>{          // E5 -> B5, a friendly little "ding-ding"
+    const o=audioCtx.createOscillator(), g=audioCtx.createGain();
+    o.type='triangle'; o.frequency.value=n.f; o.connect(g); g.connect(audioCtx.destination);
+    const s=now+n.t;
+    g.gain.setValueAtTime(0.0001,s);
+    g.gain.exponentialRampToValueAtTime(0.25,s+0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001,s+0.42);
+    o.start(s); o.stop(s+0.45);
+  });
+}
+function stopFlash(){ if(titleTimer){clearInterval(titleTimer);titleTimer=null;} document.title='Rummikub Online'; }
+function flashTitle(){ stopFlash(); if(document.hidden){ let on=false; titleTimer=setInterval(()=>{ document.title=(on=!on)?'🔔 Your turn!':'Rummikub Online'; },800); } }
+function maybeNotify(){
+  if(S&&S.phase==='play'&&S.you&&S.you.yourTurn&&S.turnSeq!==notifiedSeq){ notifiedSeq=S.turnSeq; chime(); flashTitle(); }
+  if(S&&S.you&&!S.you.yourTurn) stopFlash();
+}
+window.addEventListener('pointerdown',unlockAudio);
+document.addEventListener('visibilitychange',()=>{ if(!document.hidden) stopFlash(); });
 const sendJSON=o=>ws&&ws.readyState===1&&ws.send(JSON.stringify(o));
 
 function orderRack(tiles){
@@ -214,7 +238,8 @@ function renderGame(){
   wrap.innerHTML=`
    <header><div class="ttl">Rummikub</div>
      <div class="chip">Pool <b>${S.poolCount}</b></div>
-     <div class="chip">${esc(S.code)}</div></header>
+     <div class="chip">${esc(S.code)}</div>
+     <div class="chip" id="snd" style="cursor:pointer;user-select:none" title="Turn sound on/off">${soundOn?'🔔':'🔕'}</div></header>
    <div class="seats">${S.players.map(p=>`<div class="seat ${p.isTurn?'turn':''} ${p.connected?'':'off'}">
       ${p.id===ME.id?'You':esc(p.name)} <span class="ct">${p.tiles} tiles${p.melded?'':' · needs 30'}</span></div>`).join('')}</div>
    <div class="board-scroll"><div class="board" id="board"></div></div>
@@ -223,6 +248,9 @@ function renderGame(){
      <div class="tray" id="tray"></div>
    </div>
    <div class="controls" id="controls"></div>`;
+  // sound toggle
+  const sndEl=document.getElementById('snd');
+  if(sndEl) sndEl.onclick=()=>{ soundOn=!soundOn; localStorage.setItem('rk_sound',JSON.stringify(soundOn)); unlockAudio(); if(soundOn) chime(); render(); };
   // board
   const bEl=document.getElementById('board');
   if(board.length===0){ const e=document.createElement('div');e.className='board-empty';e.textContent='No tiles played yet. Make runs (e.g. 4·5·6 one colour) and sets (e.g. three 7s, different colours) totalling 30+ to start.';bEl.appendChild(e); }
