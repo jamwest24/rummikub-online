@@ -116,7 +116,7 @@ const isValidSet=ts=>isValidGroup(ts)||isValidRun(ts);
 const wrap=document.getElementById('wrap'), overlay=document.getElementById('overlay');
 const qs=new URLSearchParams(location.search);
 let ws, S=null, ME={id:null,name:''}, screen='connect', err='';
-let WB=null, WR=null, turnNew=new Set(), mySeq=-1, sel=null, statusMsg='';
+let WB=null, WR=null, turnNew=new Set(), mySeq=-1, sel=null, statusMsg='', rackOrder=[];
 
 const esc=s=>(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 function connect(){
@@ -138,12 +138,22 @@ function onMsg(m){
 }
 const sendJSON=o=>ws&&ws.readyState===1&&ws.send(JSON.stringify(o));
 
+function orderRack(tiles){
+  const byId=new Map(tiles.map(t=>[t.id,t])); const out=[];
+  for(const id of rackOrder){ if(byId.has(id)){ out.push(byId.get(id)); byId.delete(id); } }
+  for(const t of byId.values()) out.push(t);      // newly drawn tiles go to the end
+  rackOrder=out.map(t=>t.id); return out;
+}
 function syncWorking(){
-  if(S&&S.you&&S.you.yourTurn){
+  if(!S||!S.you){ WB=null; WR=null; return; }
+  if(S.you.yourTurn){
     if(S.turnSeq!==mySeq){ mySeq=S.turnSeq;
       WB=S.board.map(set=>({id:uid('s'),tiles:set.map(t=>({...t}))}));
-      WR=S.you.rack.map(t=>({...t})); turnNew=new Set(); statusMsg=''; sel=null; }
-  } else { WB=null;WR=null;turnNew=new Set();mySeq=-1;sel=null; }
+      WR=orderRack(S.you.rack).map(t=>({...t})); turnNew=new Set(); statusMsg=''; sel=null; }
+  } else {                                         // not your turn: you can still arrange your hand
+    WB=null; turnNew=new Set(); mySeq=-1; sel=null;
+    WR=orderRack(S.you.rack).map(t=>({...t}));
+  }
 }
 
 /* ---------- render ---------- */
@@ -189,7 +199,7 @@ function renderLobby(){
 function renderGame(){
   const yt=S.you&&S.you.yourTurn;
   const board=yt?WB:S.board.map(set=>({id:'s',tiles:set}));
-  const rack=yt?WR:S.you.rack;
+  const rack=WR;
   const opp=S.players.filter(p=>p.id!==ME.id);
   wrap.innerHTML=`
    <header><div class="ttl">Rummikub</div>
@@ -199,7 +209,7 @@ function renderGame(){
       ${p.id===ME.id?'You':esc(p.name)} <span class="ct">${p.tiles} tiles${p.melded?'':' · needs 30'}</span></div>`).join('')}</div>
    <div class="board-scroll"><div class="board" id="board"></div></div>
    <div class="tray-wrap">
-     <div class="tray-label">${yt?`<span class="who">Your turn</span> — drag tiles up to play`:`<span class="who">${esc(S.turnName)}'s turn</span> — your rack`}</div>
+     <div class="tray-label">${yt?`<span class="who">Your turn</span> — drag tiles up to play`:`<span class="who">${esc(S.turnName)}'s turn</span> — organize your rack while you wait`}</div>
      <div class="tray" id="tray"></div>
    </div>
    <div class="controls" id="controls"></div>`;
@@ -207,7 +217,7 @@ function renderGame(){
   const bEl=document.getElementById('board');
   if(board.length===0){ const e=document.createElement('div');e.className='board-empty';e.textContent='No tiles played yet. Make runs (e.g. 4·5·6 one colour) and sets (e.g. three 7s, different colours) totalling 30+ to start.';bEl.appendChild(e); }
   board.forEach(s=>{
-    const sd=document.createElement('div'); sd.className='set'; sd.dataset.zone='set'; sd.dataset.sid=s.id;
+    const sd=document.createElement('div'); sd.className='set'; if(yt){sd.dataset.zone='set'; sd.dataset.sid=s.id;}
     if(s.tiles.length>=3) sd.classList.add(isValidSet(s.tiles)?'valid':'bad'); else if(s.tiles.length) sd.classList.add('bad');
     s.tiles.forEach(t=>sd.appendChild(mkTile(t,yt)));
     if(yt) sd.addEventListener('click',e=>{if(e.target.closest('.tile'))return;tapContainer({kind:'set',set:s});});
@@ -217,8 +227,8 @@ function renderGame(){
     nz.addEventListener('click',()=>tapContainer({kind:'new'})); bEl.appendChild(nz); }
   // tray
   const tEl=document.getElementById('tray'); tEl.dataset.zone='rack';
-  rack.forEach(t=>tEl.appendChild(mkTile(t,yt)));
-  if(yt) tEl.addEventListener('click',e=>{if(e.target.closest('.tile'))return;tapContainer({kind:'rack'});});
+  rack.forEach(t=>tEl.appendChild(mkTile(t,true)));
+  tEl.addEventListener('click',e=>{if(e.target.closest('.tile'))return;tapContainer({kind:'rack'});});
   // controls
   const c=document.getElementById('controls');
   if(yt){
@@ -235,7 +245,11 @@ function renderGame(){
     document.getElementById('sg').onclick=()=>sortRack('group');
     if(statusMsg) document.getElementById('status').classList.add('warn');
   } else {
-    c.innerHTML=`<div class="waiting">Waiting for ${esc(S.turnName)} to play…</div>`;
+    c.innerHTML=`<button class="b-ghost" id="sr">Sort runs</button>
+      <button class="b-ghost" id="sg">Sort sets</button>
+      <div class="status">Waiting for ${esc(S.turnName)} — arrange your rack any time.</div>`;
+    document.getElementById('sr').onclick=()=>sortRack('run');
+    document.getElementById('sg').onclick=()=>sortRack('group');
   }
   renderOverlay();
 }
@@ -267,19 +281,21 @@ function mkTile(t,draggable){
   return e;
 }
 function findTile(id){
-  for(const s of WB){const i=s.tiles.findIndex(t=>t.id===id);if(i>=0)return{from:'set',set:s,idx:i,tile:s.tiles[i]};}
+  if(WB){ for(const s of WB){const i=s.tiles.findIndex(t=>t.id===id);if(i>=0)return{from:'set',set:s,idx:i,tile:s.tiles[i]};} }
   const i=WR.findIndex(t=>t.id===id); if(i>=0)return{from:'rack',idx:i,tile:WR[i]};
   return null;
 }
 function moveTile(id,dest,idx){
   const loc=findTile(id); if(!loc)return;
+  if(!WB && dest.kind!=='rack') return;            // off your turn, you can only rearrange your rack
   if(loc.from==='set'){ if(dest.kind==='rack'&&!turnNew.has(id)){shake();return;} loc.set.tiles.splice(loc.idx,1); }
   else WR.splice(loc.idx,1);
   const t=loc.tile;
   if(dest.kind==='rack'){ turnNew.delete(id); ins(WR,t,idx); }
   else if(dest.kind==='new'){ if(loc.from==='rack')turnNew.add(id); WB.push({id:uid('s'),tiles:[t]}); }
   else { if(loc.from==='rack')turnNew.add(id); ins(dest.set.tiles,t,idx); }
-  WB=WB.filter(s=>s.tiles.length); sel=null; statusMsg=''; render();
+  if(WB) WB=WB.filter(s=>s.tiles.length);
+  rackOrder=WR.map(t=>t.id); sel=null; statusMsg=''; render();
 }
 const ins=(a,t,i)=>{ if(i==null||i<0||i>a.length)a.push(t); else a.splice(i,0,t); };
 function tapContainer(dest){ if(!sel)return; moveTile(sel,dest,null); }
@@ -308,7 +324,7 @@ function sortRack(mode){
   const jok=WR.filter(t=>t.joker),real=WR.filter(t=>!t.joker);
   if(mode==='run')real.sort((a,b)=>a.color===b.color?a.num-b.num:COLORS.indexOf(a.color)-COLORS.indexOf(b.color));
   else real.sort((a,b)=>a.num===b.num?COLORS.indexOf(a.color)-COLORS.indexOf(b.color):a.num-b.num);
-  WR=[...real,...jok]; render();
+  WR=[...real,...jok]; rackOrder=WR.map(t=>t.id); render();
 }
 function commit(){
   // light local check for fast feedback
