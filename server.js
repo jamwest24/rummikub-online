@@ -205,9 +205,15 @@ function handle(ws, m) {
       if (!room) return send(ws, { type: 'error', message: 'No game with that code.' });
       const name = (m.name || '').trim().slice(0, 14) || 'Player';
       let p = m.playerId && room.players.get(m.playerId);
-      if (p) { p.ws = ws; p.connected = true; p.name = name; }   // reconnect
+      if (!p) {
+        // reclaim a disconnected seat with the same name — lets you rejoin from any device
+        for (const cand of room.players.values()) {
+          if (!cand.connected && cand.name.toLowerCase() === name.toLowerCase()) { p = cand; break; }
+        }
+      }
+      if (p) { p.ws = ws; p.connected = true; p.name = name; }   // reconnect / reclaim
       else {
-        if (room.phase !== 'lobby') return send(ws, { type: 'error', message: 'That game has already started.' });
+        if (room.phase !== 'lobby') return send(ws, { type: 'error', message: 'This game is in progress — to get back in, join with the exact name you were using.' });
         if (room.order.length >= 4) return send(ws, { type: 'error', message: 'That game is full (4 players).' });
         const id = crypto.randomUUID();
         p = { id, name, ws, connected: true, rack: [], melded: false };
