@@ -117,24 +117,34 @@ const wrap=document.getElementById('wrap'), overlay=document.getElementById('ove
 const qs=new URLSearchParams(location.search);
 let ws, S=null, ME={id:null,name:''}, screen='connect', err='';
 let WB=null, WR=null, turnNew=new Set(), mySeq=-1, sel=null, statusMsg='', rackOrder=[];
+let CODE=null, reconnecting=false;
+const lsGet=(k,d)=>{try{const v=localStorage.getItem(k);return v==null?d:JSON.parse(v);}catch{return d;}};
+const saveOrder=()=>{ if(CODE){ try{ localStorage.setItem('rkorder:'+CODE, JSON.stringify(rackOrder)); }catch{} } };
 
 const esc=s=>(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 function connect(){
   const proto=location.protocol==='https:'?'wss':'ws';
   ws=new WebSocket(`${proto}://${location.host}/ws`);
   ws.onopen=()=>{ off(false);
-    const saved=JSON.parse(localStorage.getItem('rk')||'null');
-    if(saved&&saved.code&&saved.id){ ME.id=saved.id; ME.name=saved.name||''; ws.send(JSON.stringify({type:'join',code:saved.code,name:ME.name,playerId:ME.id})); } };
+    const saved=lsGet('rk',null);
+    if(saved&&saved.code&&saved.id){ ME.id=saved.id; ME.name=saved.name||''; reconnecting=true;
+      ws.send(JSON.stringify({type:'join',code:saved.code,name:ME.name,playerId:ME.id})); } };
   ws.onmessage=e=>{ const m=JSON.parse(e.data); onMsg(m); };
   ws.onclose=()=>{ off(true); setTimeout(connect,1500); };
   ws.onerror=()=>ws.close();
 }
 const off=v=>document.getElementById('offline').style.display=v?'block':'none';
 function onMsg(m){
-  if(m.type==='joined'){ ME.id=m.playerId; localStorage.setItem('rk',JSON.stringify({code:m.code,id:m.id,name:ME.name})); }
-  if(m.type==='error'){ err=m.message; if(!S) render(); else { statusMsg=m.message; renderStatus(true); } }
+  if(m.type==='joined'){ ME.id=m.playerId; CODE=m.code; reconnecting=false;
+    localStorage.setItem('rk',JSON.stringify({code:m.code,id:m.playerId,name:ME.name}));
+    rackOrder=lsGet('rkorder:'+CODE,[]); }
+  if(m.type==='error'){
+    if(reconnecting){ reconnecting=false; localStorage.removeItem('rk'); S=null; screen='connect';
+      err='Your previous game has ended — start or join a new one.'; render(); }
+    else { err=m.message; if(!S) render(); else { statusMsg=m.message; renderStatus(true); } }
+  }
   if(m.type==='reject'){ statusMsg=m.message; renderStatus(true); shake(); }
-  if(m.type==='state'){ S=m.state; err=''; screen=S.phase==='lobby'?'lobby':(S.phase==='over'?'game':'game'); syncWorking(); render(); }
+  if(m.type==='state'){ S=m.state; CODE=S.code; err=''; screen=S.phase==='lobby'?'lobby':'game'; syncWorking(); render(); }
 }
 const sendJSON=o=>ws&&ws.readyState===1&&ws.send(JSON.stringify(o));
 
@@ -142,7 +152,7 @@ function orderRack(tiles){
   const byId=new Map(tiles.map(t=>[t.id,t])); const out=[];
   for(const id of rackOrder){ if(byId.has(id)){ out.push(byId.get(id)); byId.delete(id); } }
   for(const t of byId.values()) out.push(t);      // newly drawn tiles go to the end
-  rackOrder=out.map(t=>t.id); return out;
+  rackOrder=out.map(t=>t.id); saveOrder(); return out;
 }
 function syncWorking(){
   if(!S||!S.you){ WB=null; WR=null; return; }
@@ -295,7 +305,7 @@ function moveTile(id,dest,idx){
   else if(dest.kind==='new'){ if(loc.from==='rack')turnNew.add(id); WB.push({id:uid('s'),tiles:[t]}); }
   else { if(loc.from==='rack')turnNew.add(id); ins(dest.set.tiles,t,idx); }
   if(WB) WB=WB.filter(s=>s.tiles.length);
-  rackOrder=WR.map(t=>t.id); sel=null; statusMsg=''; render();
+  rackOrder=WR.map(t=>t.id); saveOrder(); sel=null; statusMsg=''; render();
 }
 const ins=(a,t,i)=>{ if(i==null||i<0||i>a.length)a.push(t); else a.splice(i,0,t); };
 function tapContainer(dest){ if(!sel)return; moveTile(sel,dest,null); }
@@ -324,7 +334,7 @@ function sortRack(mode){
   const jok=WR.filter(t=>t.joker),real=WR.filter(t=>!t.joker);
   if(mode==='run')real.sort((a,b)=>a.color===b.color?a.num-b.num:COLORS.indexOf(a.color)-COLORS.indexOf(b.color));
   else real.sort((a,b)=>a.num===b.num?COLORS.indexOf(a.color)-COLORS.indexOf(b.color):a.num-b.num);
-  WR=[...real,...jok]; rackOrder=WR.map(t=>t.id); render();
+  WR=[...real,...jok]; rackOrder=WR.map(t=>t.id); saveOrder(); render();
 }
 function commit(){
   // light local check for fast feedback
